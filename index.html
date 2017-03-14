@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mario Level 1</title>
+</head>
+<body onload="startgame()">
+<center>
+    <canvas id="canvas" width="1200" height="600" style="border: 10px solid darksalmon"></canvas>
+</center>
+
+<script>
+    var surfaces = [];
+    var obstacles = [];
+    var mario;
+    var finalsurface;
+    var background;
+
+    var mariojump,mariodie,mariomusic;
+    var myscreen = {
+        canvas: document.getElementById("canvas"),
+        ctx: this.canvas.getContext("2d"),
+        width: this.canvas.getAttribute("width"),
+        height: this.canvas.getAttribute("height"),
+        clearscreen: function () {
+            this.ctx.clearRect(0, 0, this.width, this.height);
+        },
+
+        run: function () {
+
+            this.frameNo = 0;
+            this.interval = setInterval(updatescreen, 20);
+            window.addEventListener("keydown", function flagup(event) {
+                myscreen.arr = (myscreen.arr || []);
+                myscreen.arr[event.keyCode] = true;
+            })
+            window.addEventListener("keyup",
+                    function flagdown(event) {
+                        myscreen.arr[event.keyCode] = false;
+                    })
+        },
+        stopgame: function () {
+            clearInterval(this.interval);
+        }
+
+    };
+    function setattr(x, y, color, width, height, type) {
+        this.type = type;
+        this.x = x;
+        this.y = y;
+
+        this.color = color;
+        this.width = width;
+        this.height = height;
+        if (type == "image" || type == "background") {
+            this.image = new Image();
+            this.image.src = color;
+        }
+        this.speedX = 0;
+        this.speedY = 0;
+        this.originalgravity = +.050;//s=v.t(.4 * 25 is 10) .016 for -.4 is good try hehe
+        this.originalgspeed = -3.50;//25 frames=500milli sec ; 1frame =20milli sec;.4 pixels/frame
+
+        this.gravity = +.050;//s=v.t(.4 * 25 is 10) .016 for -.4 is good try hehe
+        this.gravitySpeed = -3.50;//25 frames=500milli sec ; 1frame =20milli sec;.4 pixels/frame
+        this.flag=false;
+        this.flagIsOnSurface=true;
+        this.updateobject = function () {
+            // var xx=window.event.which;
+            /*      if(this.x>myscreen.width)
+             this.x=0;
+             else if(this.x<0)
+             this.x=myscreen.width;
+             */
+            if (this.type == "text") {
+                myscreen.ctx.font = this.width + " " + this.height;
+                myscreen.ctx.fillStyle = this.color;
+                myscreen.ctx.fillText(this.text, this.x, this.y);
+            }
+            else if (this.type == "image" || this.type == "background") {
+                myscreen.ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
+                if (this.type == "background") {
+                    myscreen.ctx.drawImage(this.image, this.x + this.width, this.y, this.width, this.height);
+
+                }
+            }
+            else {
+                myscreen.ctx.fillStyle = this.color;
+
+                myscreen.ctx.fillRect(this.x, this.y, this.width, this.height);
+            }
+        }
+
+//controllers movement
+        this.mymovement = function () {
+            if (this.type == "background") {
+                if (this.x == -this.width)
+                    this.x = 0;
+            }
+            else {
+                if (myscreen.arr && myscreen.arr[37])
+                    this.x -= 4;//left
+                if (myscreen.arr && myscreen.arr[39])
+                    this.x += 4;//right
+//jump
+                if(myscreen.arr && myscreen.arr[38] && this.flag==false )
+                {
+                    mariojump.play();
+                    this.flag=true;
+                    this.gravitySpeed=this.originalgspeed;
+                    this.gravity=this.originalgravity;
+                    this.flagIsOnSurface=false;
+                    this.image.src="mariojump1.png";
+                }
+                if(this.flag==true ||this.flagIsOnSurface==false )
+                {
+
+                    this.y+=this.gravitySpeed;
+                    this.gravitySpeed+=this.gravity;
+                    if(this.gravitySpeed==0 )
+                        this.gravitySpeed=-this.gravity;
+                }
+
+
+//checking surface
+                var checkstatus,status=false;
+                for (var i = 0; i < surfaces.length; i++) {
+                    checkstatus= mario.checksurface(surfaces[i]);
+                    if(status==false && checkstatus==true)
+                        status=true;
+                }
+                if(status==false)
+                    this.flagIsOnSurface=false;
+
+                mario.checksurface(finalsurface);
+//checking if not on surface..die
+
+            }
+        }
+        //checking for crash---obstacle hit---!!
+        this.checkcrash = function (otherobs) {
+            var myleft = this.x;
+            var myright = this.x + this.width;
+            var mytop = this.y;
+            var mybottom = this.y + this.height;
+            var otherleft = otherobs.x;
+            var otherright = otherobs.x + otherobs.width;
+            var othertop = otherobs.y;
+            var otherbottom = othertop + otherobs.height;
+            var status = true;//if true thn it means its crashing :/ :(
+            if ((mytop > (otherbottom )) || (mybottom < othertop ) || (myleft > otherright) || (myright < otherleft)) {
+                status = false;
+            }
+            return status;
+        }
+        this.checksurface = function (otherobs) {
+            var myleft = this.x;
+            var myright = this.x + this.width;
+            var mytop = this.y;
+            var mybottom = this.y + this.height;
+            var otherleft = otherobs.x;
+            var otherright = otherobs.x + otherobs.width;
+            var othertop = otherobs.y;
+            var otherbottom = othertop + otherobs.height;
+            var res = othertop - this.height;
+            var status = true;
+            if ((mytop > (otherbottom-3 )) || (mybottom < othertop-3) || (myleft > otherright) || (myright < otherleft)) {
+                status = false;//not touching
+
+            }
+            if (status == true && mytop < othertop) {//touching
+
+                this.y = res;
+                if(this.flag==true) {
+                    this.flag = false;
+                    this.image.src=this.color;
+                }
+                this.flagIsOnSurface=true;//it is on surface
+                // if( mytop>=othertop)
+                // this.x=;
+                //think abt how to make it rough at right/left edge...!!!! :? :? ;/
+            }
+            return status;
+
+
+        }
+        this.checkfinalsurface = function (otherobs) {
+            var myleft = this.x;
+            var myright = this.x + this.width;
+            var mytop = this.y;
+            var mybottom = this.y + this.height;
+            var otherleft = otherobs.x;
+            var otherright = otherobs.x + otherobs.width;
+            var othertop = otherobs.y;
+            var otherbottom = othertop + otherobs.height;
+            var res = othertop - this.height;
+            var status = true;
+            if ((mytop > (otherbottom )) || (mybottom < othertop) || (myleft > otherright) || (myright < otherleft)) {
+                status = false;
+            }
+
+            return status;
+
+
+        }
+        this.outofscreen=function () {
+            if(this.y>myscreen.height) {
+             mariomusic.stop();
+                mariodie.play();
+                myscreen.stopgame();
+            }
+            }
+    }
+    function soundplay(src, type) {
+        this.sound = document.createElement("audio");
+        this.type = type;
+        this.sound.src = src;
+        this.sound.setAttribute("preload", "auto");
+        if (this.type == "sound")
+            this.sound.setAttribute("controls", "none");
+        else if (this.type == "music") {
+            this.sound.setAttribute("controls", "loop");
+            this.sound.loop = true;
+        }
+        this.sound.style.display = "none";
+        document.body.appendChild(this.sound);
+        this.play = function () {
+            this.sound.play();
+        }
+        this.stop = function () {
+            this.sound.pause();
+        }
+
+
+    }
+
+
+    //---see here---//
+    function startgame() {
+        mariomusic=new soundplay("mariomusiccut.mp3","music");
+        mariomusic.play();
+        mariojump=new soundplay("mariojump.wav","sound");
+        mariodie=new soundplay("smb_mariodie.wav","sound");
+        stageclear=new soundplay("smb_world_clear.wav","sound");
+        mario = new setattr(100, 500, "mario1.png", 30, 30,"image");
+        surfaces[0] = new setattr(0, 530, "brown", 1000, 170);
+        background=new setattr(0,0,"background.png",1200,600,"background");
+        // surfaces[1]=new setattr((2600),530,"orange",myscreen.width,200);
+        for (var i = 1; i < 4; i++)
+            surfaces[i] = new setattr((1000 * i + 200), 530, "brown", 700 + (100 * i), 200);
+//surfaces[i]=new setattr(surfaces[i-1].x+surfaces[i-1].width+(i*250%400),530,"brown",surfaces[i-1].width,200);
+        var ck = 500;
+        for (var i = 0; i < 3; i++) {
+            obstacles[i] = new setattr(ck, 500, "obstacle.png", 30, 30,"image");
+            ck += Math.round(Math.random() * 40) + 40;
+        }
+        ck = 1500
+        for (var i = 3; i < 6; i++) {
+            obstacles[i] = new setattr(ck, 500, "obstacle.png", 30, 30,"image");
+            ck += Math.round(Math.random() * 60) + 55;
+        }
+        ck = 2400
+        for (var i = 6; i < 9; i++) {
+            obstacles[i] = new setattr(ck, 500, "obstacle.png", 30, 30,"image");
+            ck += Math.round(Math.random() * 75) + 75;
+        }
+        ck = 3800;
+        for (var i = 9; i < 13; i++) {
+            obstacles[i] = new setattr(ck, 500, "obstacle.png", 30, 30,"image");
+            ck += Math.round(Math.random() * 100) + 70;
+        }
+        finalsurface = new setattr(1000 * 3 + 200 + 700 + 100 * 3, 530, "lightgreen", 600, 200);
+        myscreen.run();
+
+    }
+
+    var counter=0,mfl=false;
+    function updatescreen() {
+        myscreen.clearscreen();
+        background.x--;
+        background.mymovement();
+        background.updateobject();
+        mario.outofscreen();
+        if (mario.checkfinalsurface(finalsurface)) {
+            //play the sound :P :P
+            mario.x++;
+            if(mfl==false)
+            {
+                mariomusic.stop();
+                stageclear.play();
+                mfl=true;
+            }
+            //    removeEventListener();
+//                mario.updateobject();
+            counter++;
+            if(finalsurface.x==300) {
+                myscreen.stopgame();
+            }
+        }
+        else
+            mario.mymovement();
+
+
+        for (var i = 0; i < obstacles.length; i++) {
+            if (mario.checkcrash(obstacles[i])) {
+                mariomusic.stop();
+                mariodie.play();
+                myscreen.stopgame();
+            }
+        }
+
+        var dif = 0;
+        if (mario.x >= (myscreen.width / 2)) {
+            dif = mario.x - (myscreen.width / 2);
+            mario.x = myscreen.width / 2;
+
+            for (var i = 0; i < surfaces.length; i++) {
+                surfaces[i].x -= dif;
+            }
+            for (var i = 0; i < 13; i++)
+                obstacles[i].x -= dif;
+            finalsurface.x -= dif;
+        }
+        for (var i = 0; i < surfaces.length; i++)
+            surfaces[i].updateobject();
+
+        mario.updateobject();
+        finalsurface.updateobject();
+
+        for (var i = 0; i < 13; i++) {
+            if (obstacles[i].x < 1200) {
+                obstacles[i].x -= 2;
+                //obstacles[i].mymovement();
+            }
+            obstacles[i].updateobject();
+        }
+    }
+</script>
+</body>
+</html>
